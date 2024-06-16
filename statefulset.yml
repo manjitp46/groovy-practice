@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    meta.helm.sh/release-name: dtrack
+    meta.helm.sh/release-namespace: dtrack
+  labels:
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/instance: dtrack
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: dependency-track-api-server
+    app.kubernetes.io/part-of: dependency-track
+    app.kubernetes.io/version: 4.11.3
+    helm.sh/chart: dependency-track-0.8.0
+  name: dtrack-dependency-track-api-server
+  namespace: dtrack
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: api-server
+      app.kubernetes.io/instance: dtrack
+      app.kubernetes.io/name: dependency-track-api-server
+  serviceName: dtrack-dependency-track-api-server
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/scrape: "true"
+      labels:
+        app.kubernetes.io/component: api-server
+        app.kubernetes.io/instance: dtrack
+        app.kubernetes.io/name: dependency-track-api-server
+    spec:
+      containers:
+      - env:
+        - name: ALPINE_METRICS_ENABLED
+          value: "true"
+        image: docker.io/dependencytrack/apiserver:4.11.3
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health/live
+            port: web
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: dependency-track-api-server
+        ports:
+        - containerPort: 8080
+          name: web
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health/ready
+            port: web
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: "4"
+            memory: 5Gi
+          requests:
+            cpu: "2"
+            memory: 5Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        - mountPath: /tmp
+          name: tmp
+      initContainers:
+      - name: init-data-dir
+        image: busybox
+        command: ['sh', '-c', 'mkdir -p /data/.dependency-track && chmod -R 777 /data/.dependency-track']
+        volumeMounts:
+        - mountPath: /data
+          name: data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: dtrack-dependency-track
+      serviceAccountName: dtrack-dependency-track
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: dtrack-data-pvc
+      - emptyDir: {}
+        name: tmp
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
