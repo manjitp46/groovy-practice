@@ -1,0 +1,54 @@
+/**
+ * Function to convert a purl to a component object
+ * @param {string} purlString - The package URL string to be converted
+ * @returns {Object} - The component object with parsed details
+ */
+function convertPurlToComponent(purlString) {
+  if (!purlString.startsWith("pkg:")) {
+    throw new Error("Invalid purl: Must start with 'pkg:'");
+  }
+
+  // Remove 'pkg:' prefix
+  const purlWithoutPrefix = purlString.substring(4);
+
+  // Parse subpath
+  const [purlWithoutSubpath, subpath] = purlWithoutPrefix.split('#', 2);
+
+  // Parse qualifiers
+  const [purlWithoutQualifiers, qualifiersString] = purlWithoutSubpath.split('?', 2);
+  const qualifiers = qualifiersString
+    ? Object.fromEntries(new URLSearchParams(qualifiersString))
+    : null;
+
+  // Parse type, namespace, name, and version
+  const [typeAndNamespace, version] = purlWithoutQualifiers.split('@', 2);
+  const [type, ...namespaceAndName] = typeAndNamespace.split('/');
+
+  let namespace = null;
+  let name;
+
+  if (namespaceAndName.length > 1) {
+    namespace = namespaceAndName.slice(0, -1).join('/');
+    name = namespaceAndName[namespaceAndName.length - 1];
+  } else {
+    name = namespaceAndName[0];
+  }
+
+  // Construct the component object
+  const component = {
+    type: type || null,
+    namespace: namespace || null,
+    name: name || null,
+    version: version || null,
+    qualifiers: qualifiers || null,
+    subpath: subpath || null,
+  };
+
+  return component;
+}
+
+// Example usage
+const examplePurl = "pkg:npm/left-pad@1.3.0?arch=amd64&os=linux#src/utils";
+const component = convertPurlToComponent(examplePurl);
+
+console.log('Component:', component);
